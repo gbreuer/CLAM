@@ -89,7 +89,7 @@ class WholeSlideImage(object):
         save_pkl(mask_file, asset_dict)
 
     def segmentTissue(self, seg_level=0, sthresh=20, sthresh_up = 255, mthresh=7, close = 0, use_otsu=False, 
-                            filter_params={'a_t':100}, ref_patch_size=512, exclude_ids=[], keep_ids=[]):
+                            filter_params={'a_t':100}, ref_patch_size=512, exclude_ids=[], keep_ids=[], input_mask_path=None):
         """
             Segment the tissue via HSV -> Median thresholding -> Binary threshold
         """
@@ -143,6 +143,13 @@ class WholeSlideImage(object):
             return foreground_contours, hole_contours
         
         img = np.array(self.wsi.read_region((0,0), seg_level, self.level_dim[seg_level]))
+        
+        if input_mask_path and os.path.exists(input_mask_path):
+            mask = cv2.imread(input_mask_path)
+            a, b, _ = img.shape
+            mask = cv2.resize(mask, (b,a))
+            mask = cv2.cvtColor(mask, cv2.COLOR_RGB2RGBA)
+            img = cv2.bitwise_and(img, mask)
         img_hsv = cv2.cvtColor(img, cv2.COLOR_RGB2HSV)  # Convert to HSV space
         img_med = cv2.medianBlur(img_hsv[:,:,1], mthresh)  # Apply median blurring
         

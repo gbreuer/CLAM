@@ -18,7 +18,7 @@ def stitching(file_path, wsi_object, downscale = 64):
 	
 	return heatmap, total_time
 
-def segment(WSI_object, seg_params = None, filter_params = None, mask_file = None):
+def segment(WSI_object, seg_params = None, filter_params = None, mask_file = None, input_mask_path= None):
 	### Start Seg Timer
 	start_time = time.time()
 	# Use segmentation file
@@ -26,7 +26,7 @@ def segment(WSI_object, seg_params = None, filter_params = None, mask_file = Non
 		WSI_object.initSegmentation(mask_file)
 	# Segment	
 	else:
-		WSI_object.segmentTissue(**seg_params, filter_params=filter_params)
+		WSI_object.segmentTissue(**seg_params, filter_params=filter_params, input_mask_path=input_mask_path)
 
 	### Stop Seg Timers
 	seg_time_elapsed = time.time() - start_time   
@@ -45,10 +45,11 @@ def patching(WSI_object, **kwargs):
 	return file_path, patch_time_elapsed
 
 
-def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_dir, 
+#TODO: add input_mask_path to autogen process list
+def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_dir, input_mask_dir,
 				  patch_size = 256, step_size = 256, 
 				  seg_params = {'seg_level': -1, 'sthresh': 8, 'mthresh': 7, 'close': 4, 'use_otsu': False,
-				  'keep_ids': 'none', 'exclude_ids': 'none'},
+				  'keep_ids': 'none', 'exclude_ids': 'none', 'input_mask_dir': 'none'},
 				  filter_params = {'a_t':100, 'a_h': 16, 'max_n_holes':8}, 
 				  vis_params = {'vis_level': -1, 'line_thickness': 500},
 				  patch_params = {'use_padding': True, 'contour_fn': 'four_pt'},
@@ -186,7 +187,11 @@ def seg_and_patch(source, save_dir, patch_save_dir, mask_save_dir, stitch_save_d
 
 		seg_time_elapsed = -1
 		if seg:
-			WSI_object, seg_time_elapsed = segment(WSI_object, current_seg_params, current_filter_params) 
+			if (input_mask_dir) and (input_mask_dir != 'none'):
+				input_mask_path = os.path.join(input_mask_dir, os.path.splitext(slide)[0]+'.png')
+				WSI_object, seg_time_elapsed = segment(WSI_object, current_seg_params, current_filter_params, None, input_mask_path)
+			else:
+				WSI_object, seg_time_elapsed = segment(WSI_object, current_seg_params, current_filter_params)
 
 		if save_mask:
 			mask = WSI_object.visWSI(**current_vis_params)
@@ -246,6 +251,8 @@ parser.add_argument('--patch_level', type=int, default=0,
 					help='downsample level at which to patch')
 parser.add_argument('--process_list',  type = str, default=None,
 					help='name of list of images to process with parameters (.csv)')
+parser.add_argument('--input_mask_dir', default=None,  type = str,
+					help='name of directory containing image masks previously made')
 
 if __name__ == '__main__':
 	args = parser.parse_args()
@@ -269,11 +276,12 @@ if __name__ == '__main__':
 				   'save_dir': args.save_dir,
 				   'patch_save_dir': patch_save_dir, 
 				   'mask_save_dir' : mask_save_dir, 
-				   'stitch_save_dir': stitch_save_dir} 
+				   'stitch_save_dir': stitch_save_dir,
+                   'input_mask_dir': args.input_mask_dir} 
 
 	for key, val in directories.items():
 		print("{} : {}".format(key, val))
-		if key not in ['source']:
+		if key not in ['source', 'input_mask_dir']:
 			os.makedirs(val, exist_ok=True)
 
 	seg_params = {'seg_level': -1, 'sthresh': 8, 'mthresh': 7, 'close': 4, 'use_otsu': False,
